@@ -21,11 +21,6 @@ Q12 = nu12 * E22 / (1 - nu12 * nu21)
 Q22 = E22 / (1 - nu21 * nu12)
 Q66 = G12
 
-Q = np.array([[Q11, Q12, 0],
-              [Q12, Q22, 0],
-              [0, 0, Q66]
-              ])
-
 
 def Q_bar(theta):
     theta_rad = np.deg2rad(theta)
@@ -59,25 +54,25 @@ def D_mat(sym_angles):
     m_hPanel = m_numLayers * tLayer
 
     # array of all z_k
-    m_zks = np.zeros(m_numLayers + 1)
-    m_zks[0] = -m_hPanel / 2
+    m_zk = np.zeros(m_numLayers + 1)
+    m_zk[0] = -m_hPanel / 2
     for zk in range(1, m_numLayers + 1):
-        m_zks[zk] = m_zks[zk - 1] + tLayer
+        m_zk[zk] = m_zk[zk - 1] + tLayer
 
     # array of z_k+1^3-z_k^3
-    diff_zk3s = np.zeros(m_numLayers)
+    diff_zk3 = np.zeros(m_numLayers)
     for k in range(m_numLayers):
-        diff_zk3s[k] = m_zks[k + 1] ** 3 - m_zks[k] ** 3
+        diff_zk3[k] = m_zk[k + 1] ** 3 - m_zk[k] ** 3
 
     Q_bars = [0] * m_numLayers
     for k in range(m_numLayers):
         Q_bars[k] = Q_bar(m_angles[k])
 
-    D_ks = [0] * m_numLayers
+    D_k = [0] * m_numLayers
 
     for k in range(m_numLayers):
-        D_ks[k] = Q_bars[k] * diff_zk3s[k]
-    D = np.array(D_ks).sum(axis=0) / 3
+        D_k[k] = Q_bars[k] * diff_zk3[k]
+    D = np.array(D_k).sum(axis=0) / 3
 
     return D
 
@@ -88,25 +83,25 @@ def A_mat(sym_angles):
     m_hPanel = m_numLayers * tLayer
 
     # array of all z_k
-    m_zks = np.zeros(m_numLayers + 1)
-    m_zks[0] = -m_hPanel / 2
+    m_zk = np.zeros(m_numLayers + 1)
+    m_zk[0] = -m_hPanel / 2
     for zk in range(1, m_numLayers + 1):
-        m_zks[zk] = m_zks[zk - 1] + tLayer
+        m_zk[zk] = m_zk[zk - 1] + tLayer
 
-    # array of z_k+1^3-z_k^3
-    diff_zks = np.zeros(m_numLayers)
+    # array of z_k+1-z_k
+    diff_zk = np.zeros(m_numLayers)
     for k in range(m_numLayers):
-        diff_zks[k] = m_zks[k + 1] - m_zks[k]
+        diff_zk[k] = m_zk[k + 1] - m_zk[k]
 
     Q_bars = [0] * m_numLayers
     for k in range(m_numLayers):
         Q_bars[k] = Q_bar(m_angles[k])
 
-    A_ks = [0] * m_numLayers
+    A_k = [0] * m_numLayers
 
     for k in range(m_numLayers):
-        A_ks[k] = Q_bars[k] * diff_zks[k]
-    A = np.array(A_ks).sum(axis=0)
+        A_k[k] = Q_bars[k] * diff_zk[k]
+    A = np.array(A_k).sum(axis=0)
 
     return A
 
@@ -116,6 +111,7 @@ def sig_x_cr(b, t, beta, alpha, m, n, D11, D12, D22, D66):
             D11 * (m / alpha) ** 4 + 2 * (D12 + D66) * (m * n / alpha) ** 2 + D22 * n ** 4)
 
 
+# helper function to find amount of halfwaves for minimal stability
 def halfwavesObj(hWaves, b, t, beta, alpha, D11, D12, D22, D66):
     m, n = hWaves
     return sig_x_cr(b, t, beta, alpha, m, n, D11, D12, D22, D66)
@@ -152,10 +148,29 @@ def optimizeAngles(numLayers, initAngle):
 
     con1 = {'type': 'eq', 'fun': lambda sym_angles: A_mat(sym_angles)[0][2]}  # balanced
     con2 = {'type': 'eq', 'fun': lambda sym_angles: A_mat(sym_angles)[1][2]}  # balanced
-    cons = [con1, con2]
+    con3 = {'type': 'ineq', 'fun': lambda sym_angles: 1 - R_panelbuckling(sym_angles)}  # panel does not buckle
+    con4 = "strength check"
+    cons = [con1, con2, con3]
 
     solution = minimize(R_panelbuckling, initialAngles, method='SLSQP', bounds=angleBounds, constraints=cons)
     return solution
+
+
+def T_mat(theta):
+    theta_rad = np.deg2rad(theta)
+    return np.array([
+        [np.cos(theta_rad) ** 2, np.sin(theta_rad) ** 2, 2 * np.sin(theta_rad) * np.cos(theta_rad)],
+        [np.sin(theta_rad) ** 2, np.cos(theta_rad) ** 2, -2 * np.sin(theta_rad) * np.cos(theta_rad)],
+        [-np.sin(theta_rad) * np.cos(theta_rad), np.sin(theta_rad) * np.cos(theta_rad), np.cos(theta_rad) ** 2 - np.sin(theta_rad) ** 2]
+    ])
+
+
+def RF_strength(sym_angles):
+    numLayers = len(sym_angles) * 2
+    t = numLayers * tLayer
+    for k in range(numLayers):
+        matT = T_mat(sym_angles[k])
+    print("RF_STRENGTH")
 
 
 minLayers = 18
@@ -163,11 +178,12 @@ maxLayers = 40
 optimalLayers = maxLayers
 optimalAngles = []
 
+
 def optimalLayers(initAngle):
     for numLayers in range(minLayers, maxLayers + 1):
         solution = optimizeAngles(numLayers, initAngle)
         print(numLayers, solution)
-        if solution.success and solution.fun < 1:
+        if solution.success:
             optimalLayers = numLayers
             optimalAngles = solution.x
             print("D:")
@@ -178,6 +194,7 @@ def optimalLayers(initAngle):
             print(optimalLayers * 2)
             print(solution.fun)
             return solution
+
 
 optimalLayers(45)
 # TODO: Add functionality to avoid local minima
