@@ -1,19 +1,22 @@
 from scipy.optimize import minimize
 import numpy as np
 
-# Einschränkungen: nur symmetrische Laminate mit gerader Anzahl von schichten
-a = 600
-b = 400
+# Einschränkungen: nur symmetrische Laminate mit gerader Anzahl von schichten TODO: Check if statement is true
+a = 400  # 400mm-800mm
+b = 250  # 150mm-250mm
 alpha = a / b
-sigma_x = -43.051
-sigma_y = 10.122
-beta = sigma_y / sigma_x
-tLayer = 0.184
+N_x = -1000  # -500N to -2000N
+N_y = -500  # 300N to -1000N
+Tau = 100  # 100 to 800N
 
-E11 = 132741.56
-E22 = 10210.89
-G12 = 5105.44
-nu12 = 0.33
+beta = N_y / N_x
+tLayer = 0.184  # 0.184mm to 0.25mm
+
+E11 = 130_000  # 130_000 to 160_000 MPa
+E22 = 10_000  # 10_000 to 14_000 MPa
+G12 = 5_000  # 5_000 to 8_000 MPa
+
+nu12 = 0.33  # TODO: Needs to be calculated????
 nu21 = E22 / E11 * nu12
 
 Q11 = E11 / (1 - nu12 * nu21)
@@ -22,6 +25,7 @@ Q22 = E22 / (1 - nu21 * nu12)
 Q66 = G12
 
 
+# Creates Q_bar matrix
 def Q_bar(theta):
     theta_rad = np.deg2rad(theta)
 
@@ -48,6 +52,7 @@ def Q_bar(theta):
     return Q_bar
 
 
+# ABD Functions
 def D_mat(sym_angles):
     m_numLayers = len(sym_angles) * 2
     m_angles = np.concatenate((sym_angles, sym_angles[::-1]))
@@ -75,6 +80,35 @@ def D_mat(sym_angles):
     D = np.array(D_k).sum(axis=0) / 3
 
     return D
+
+
+def B_mat(sym_angles):
+    m_numLayers = len(sym_angles) * 2
+    m_angles = np.concatenate((sym_angles, sym_angles[::-1]))
+    m_hPanel = m_numLayers * tLayer
+
+    # array of all z_k
+    m_zk = np.zeros(m_numLayers + 1)
+    m_zk[0] = -m_hPanel / 2
+    for zk in range(1, m_numLayers + 1):
+        m_zk[zk] = m_zk[zk - 1] + tLayer
+
+    # array of z_k+1^3-z_k^3
+    diff_zk2 = np.zeros(m_numLayers)
+    for k in range(m_numLayers):
+        diff_zk2[k] = m_zk[k + 1] ** 2 - m_zk[k] ** 2
+
+    Q_bars = [0] * m_numLayers
+    for k in range(m_numLayers):
+        Q_bars[k] = Q_bar(m_angles[k])
+
+    B_k = [0] * m_numLayers
+
+    for k in range(m_numLayers):
+        B_k[k] = Q_bars[k] * diff_zk2[k]
+    B = np.array(B_k).sum(axis=0) / 3
+
+    return B
 
 
 def A_mat(sym_angles):
@@ -114,12 +148,12 @@ def sig_x_cr(b, t, beta, alpha, m, n, D11, D12, D22, D66):
 # helper function to find amount of halfwaves for minimal stability
 def halfwavesObj(hWaves, b, t, beta, alpha, D11, D12, D22, D66):
     m, n = hWaves
-    return sig_x_cr(b, t, beta, alpha, m, n, D11, D12, D22, D66)
+    return sig_x_cr(b, t, beta, alpha, round(m), round(n), D11, D12, D22, D66)
 
 
 def R_panelbuckling(sym_angles):
-    numLayers = len(sym_angles) * 2
-    t = numLayers * tLayer
+    m_numLayers = len(sym_angles) * 2
+    m_hPanel = m_numLayers * tLayer
     matD = D_mat(sym_angles)
 
     D11 = matD[0][0]
@@ -132,17 +166,16 @@ def R_panelbuckling(sym_angles):
     hWavesBnds = [hWaveBnd, hWaveBnd]
 
     result = minimize(halfwavesObj, initialHWaves, method='SLSQP', bounds=hWavesBnds,
-                      args=(b, t, beta, alpha, D11, D12, D22, D66))
+                      args=(b, m_hPanel, beta, alpha, D11, D12, D22, D66))
 
-    m, n = result.x
-    sigma_x_cr = sig_x_cr(b, t, beta, alpha, round(m), round(n), D11, D12, D22, D66)
-    return abs(sigma_x / sigma_x_cr)
+    sigma_x_cr = result.fun
+    sigma_x = N_x / m_hPanel
+    R = abs(sigma_x / sigma_x_cr)
+    print(1 / R, ", ", m_numLayers)
+    return R
 
 
-def optimizeAngles(numLayers, initAngle):
-    initialAngles = np.empty(numLayers)
-    initialAngles.fill(initAngle)
-
+def optimizeAngles(numLayers, initialSymAngles, iterCount):
     # Define bounds for angles
     angleBounds = [(-90, 90) for _ in range(numLayers)]
 
@@ -150,9 +183,13 @@ def optimizeAngles(numLayers, initAngle):
     con2 = {'type': 'eq', 'fun': lambda sym_angles: A_mat(sym_angles)[1][2]}  # balanced
     con3 = {'type': 'ineq', 'fun': lambda sym_angles: 1 - R_panelbuckling(sym_angles)}  # panel does not buckle
     con4 = "strength check"
+    con5 = "10% of each ply share"
     cons = [con1, con2, con3]
 
-    solution = minimize(R_panelbuckling, initialAngles, method='SLSQP', bounds=angleBounds, constraints=cons)
+    options = {'maxiter': iterCount}
+
+    solution = minimize(R_panelbuckling, initialSymAngles, method='trust-constr', bounds=angleBounds, constraints=cons,
+                        options=options)
     return solution
 
 
@@ -161,29 +198,38 @@ def T_mat(theta):
     return np.array([
         [np.cos(theta_rad) ** 2, np.sin(theta_rad) ** 2, 2 * np.sin(theta_rad) * np.cos(theta_rad)],
         [np.sin(theta_rad) ** 2, np.cos(theta_rad) ** 2, -2 * np.sin(theta_rad) * np.cos(theta_rad)],
-        [-np.sin(theta_rad) * np.cos(theta_rad), np.sin(theta_rad) * np.cos(theta_rad), np.cos(theta_rad) ** 2 - np.sin(theta_rad) ** 2]
+        [-np.sin(theta_rad) * np.cos(theta_rad), np.sin(theta_rad) * np.cos(theta_rad),
+         np.cos(theta_rad) ** 2 - np.sin(theta_rad) ** 2]
     ])
 
 
 def RF_strength(sym_angles):
     numLayers = len(sym_angles) * 2
-    t = numLayers * tLayer
-    for k in range(numLayers):
-        matT = T_mat(sym_angles[k])
-    print("RF_STRENGTH")
+    h = numLayers * tLayer
+    # Inverse of ABD
+    # Multiply applied Loads with ABD^-1 => epsylon_0 and k
+    # calculate epsylon_x, epsylon_y, gamma_xy for each ply
+    # transform all epsylon into material cos
+    # use Q matrix to calculate each sigma_1, sigma_2, sigma_12
+    # calculate RF_ff and RF_iff for each layer
+    # return appropriate value for failure criterion
 
 
-minLayers = 18
-maxLayers = 40
+minLayers = 22
+maxLayers = 22
 optimalLayers = maxLayers
 optimalAngles = []
 
 
 def optimalLayers(initAngle):
+    # check multiple layers with low iteration count
+    # if threshold (maybe R<1 or very close to 1) is reached after n amount of iterations run optimization for this layer count with high amount of iterations, use old final values as initial values.
     for numLayers in range(minLayers, maxLayers + 1):
-        solution = optimizeAngles(numLayers, initAngle)
+        initialSymAngles = np.empty(numLayers)
+        initialSymAngles.fill(initAngle)
+        solution = optimizeAngles(numLayers, initialSymAngles, 1000)
         print(numLayers, solution)
-        if solution.success:
+        if solution.fun < 1:
             optimalLayers = numLayers
             optimalAngles = solution.x
             print("D:")
@@ -192,7 +238,12 @@ def optimalLayers(initAngle):
             print(A_mat(optimalAngles))
             print(np.concatenate((optimalAngles, optimalAngles[::-1])))
             print(optimalLayers * 2)
-            print(solution.fun)
+            print(1 / solution.fun)
+            print("Second Optimization Step")
+            solution = optimizeAngles(optimalLayers, optimalAngles, 10000)
+            print(1 / solution.fun)
+            optimalLayers = numLayers
+            optimalAngles = solution.x
             return solution
 
 
