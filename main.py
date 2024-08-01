@@ -140,18 +140,28 @@ def A_mat(sym_angles):
     return A
 
 
-def sig_x_cr(b, t, beta, alpha, m, n, D11, D12, D22, D66):
+# biaxial
+def sig_x_cr_biax(b, t, beta, alpha, m, n, D11, D12, D22, D66):
     return np.pi ** 2 / b ** 2 / t / ((m / alpha) ** 2 + beta * n ** 2) * (
             D11 * (m / alpha) ** 4 + 2 * (D12 + D66) * (m * n / alpha) ** 2 + D22 * n ** 4)
+
+
+# shear
+def tau_cr(b, t, D11, D12, D22, D66):
+    delta = np.sqrt(D11 * D22) / (D12 + 2 * D66)  # stiffeness ratio
+    if delta >= 1:
+        return 4 / t / b ** 2 * ((D11 * D22 ** 3) ** (1 / 4) * (8.12 + 5.05 / delta))
+    else:
+        return 4 / t / b ** 2 * (np.sqrt(D22 * (D12 + 2 * D66)) * (11.7 + 0.532 * delta + 0.938 * delta ** 2))
 
 
 # helper function to find amount of halfwaves for minimal stability
 def halfwavesObj(hWaves, b, t, beta, alpha, D11, D12, D22, D66):
     m, n = hWaves
-    return sig_x_cr(b, t, beta, alpha, round(m), round(n), D11, D12, D22, D66)
+    return sig_x_cr_biax(b, t, beta, alpha, round(m), round(n), D11, D12, D22, D66)
 
 
-def R_panelbuckling(sym_angles):
+def R_panelbuckling_comb(sym_angles):
     m_numLayers = len(sym_angles) * 2
     m_hPanel = m_numLayers * tLayer
     matD = D_mat(sym_angles)
@@ -165,13 +175,26 @@ def R_panelbuckling(sym_angles):
     hWaveBnd = (1, 5)
     hWavesBnds = [hWaveBnd, hWaveBnd]
 
+    # Find amount of halfwaves that make plate as unstable as possible
     result = minimize(halfwavesObj, initialHWaves, method='SLSQP', bounds=hWavesBnds,
                       args=(b, m_hPanel, beta, alpha, D11, D12, D22, D66))
 
-    sigma_x_cr = result.fun
-    sigma_x = N_x / m_hPanel
-    R = abs(sigma_x / sigma_x_cr)
-    print(1 / R, ", ", m_numLayers)
+    # critical loads
+    m_sigma_x_cr = result.fun
+    m_tau_cr = tau_cr(b, m_hPanel, D11, D12, D22, D66)
+
+    # applied loads
+    m_sigma_x = N_x / m_hPanel
+    m_tau = Tau / m_hPanel
+
+    # R values
+    R_biax = abs(m_sigma_x / m_sigma_x_cr)
+    R_shear = abs(m_tau / m_tau_cr)
+
+    R = R_biax + R_shear ** 2
+
+    # Debug - remove - hurts performance
+    print(1 / R, "-", m_numLayers)
     return R
 
 
@@ -181,14 +204,15 @@ def optimizeAngles(numLayers, initialSymAngles, iterCount):
 
     con1 = {'type': 'eq', 'fun': lambda sym_angles: A_mat(sym_angles)[0][2]}  # balanced
     con2 = {'type': 'eq', 'fun': lambda sym_angles: A_mat(sym_angles)[1][2]}  # balanced
-    con3 = {'type': 'ineq', 'fun': lambda sym_angles: 1 - R_panelbuckling(sym_angles)}  # panel does not buckle
-    con4 = "strength check"
+    con3 = {'type': 'ineq', 'fun': lambda sym_angles: 1 - R_panelbuckling_comb(sym_angles)}  # panel does not buckle
+    con4 = "strength check"  # TODO: Necessary?
     con5 = "10% of each ply share"
     cons = [con1, con2, con3]
 
     options = {'maxiter': iterCount}
 
-    solution = minimize(R_panelbuckling, initialSymAngles, method='trust-constr', bounds=angleBounds, constraints=cons,
+    solution = minimize(R_panelbuckling_comb, initialSymAngles, method='trust-constr', bounds=angleBounds,
+                        constraints=cons,
                         options=options)
     return solution
 
@@ -215,37 +239,43 @@ def RF_strength(sym_angles):
     # return appropriate value for failure criterion
 
 
-minLayers = 22
-maxLayers = 22
-optimalLayers = maxLayers
-optimalAngles = []
+minSymLayers = 22
+maxSymLayers = 22
+optimalSymLayers = maxSymLayers
+optimalSymAngles = []
 
 
 def optimalLayers(initAngle):
-    # check multiple layers with low iteration count
-    # if threshold (maybe R<1 or very close to 1) is reached after n amount of iterations run optimization for this layer count with high amount of iterations, use old final values as initial values.
-    for numLayers in range(minLayers, maxLayers + 1):
+    for numLayers in range(minSymLayers, maxSymLayers + 1):
         initialSymAngles = np.empty(numLayers)
         initialSymAngles.fill(initAngle)
+
+        # initial optimization attempt, in order to find minimal amount of plies
         solution = optimizeAngles(numLayers, initialSymAngles, 1000)
         print(numLayers, solution)
-        if solution.fun < 1:
-            optimalLayers = numLayers
-            optimalAngles = solution.x
-            print("D:")
-            print(D_mat(optimalAngles))
-            print("A:")
-            print(A_mat(optimalAngles))
-            print(np.concatenate((optimalAngles, optimalAngles[::-1])))
-            print(optimalLayers * 2)
+        if solution.fun < 1:  # TODO: Experiment with different values close to 1
+            optimalSymLayers = numLayers
+            optimalSymAngles = solution.x
+            print(np.concatenate((optimalSymAngles, optimalSymAngles[::-1])))
+            print(optimalSymLayers * 2)
             print(1 / solution.fun)
+
+            # second optimization step in order to maximize strength of found minimal layer count
             print("Second Optimization Step")
-            solution = optimizeAngles(optimalLayers, optimalAngles, 10000)
+            solution = optimizeAngles(optimalSymLayers, optimalSymAngles, 10000)
+            optimalSymLayers = numLayers
+            optimalSymAngles = solution.x
+            print("A:")
+            print(A_mat(optimalSymAngles))
+            print("B:")
+            print(B_mat(optimalSymAngles))
+            print("D:")
+            print(D_mat(optimalSymAngles))
+            print(np.concatenate((optimalSymAngles, optimalSymAngles[::-1])))
+            print(optimalSymLayers * 2)
             print(1 / solution.fun)
-            optimalLayers = numLayers
-            optimalAngles = solution.x
+
             return solution
 
 
 optimalLayers(45)
-# TODO: Add functionality to avoid local minima
