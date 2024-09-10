@@ -14,8 +14,19 @@ def geneatePossibleAngles(start: float, end: float, interval: float):
         current += interval
     return numbers
 
+
 def generateRandomStack(m_availableAngles, m_numSymAngles):
     stackingSeq = [random.choice(m_availableAngles) for _ in range(m_numSymAngles)]
+    stackingSeq = [90.0 if angle == -90.0 else angle for angle in stackingSeq]
+    return stackingSeq
+
+def generateRandomStackPairs(m_availableAngles, m_numSymAngles):
+    stackingSeq = [random.choice(m_availableAngles) for _ in range(int(m_numSymAngles/2))]
+    negAngles = [-x for x in stackingSeq]
+    stackingSeq.extend(negAngles)
+    if m_numSymAngles % 2 != 0:
+        stackingSeq.append(random.choice([0.0, 90.0]))
+    stackingSeq = [90.0 if angle == -90.0 else angle for angle in stackingSeq]
     return stackingSeq
 
 
@@ -32,10 +43,12 @@ def generateStackingSeqs(numSymLayers: int, numStackingSeqs: int, interval: floa
     print(" ")
     m_possibleAngles = geneatePossibleAngles(-90.0, 90.0, interval)
     while len(m_initialSequences) < numStackingSeqs:
-        m_possibleStackingSeq = generateRandomStack(m_possibleAngles, numSymLayers)
-        if stackIsBalanced(m_possibleStackingSeq):
+        #m_possibleStackingSeq = generateRandomStack(m_possibleAngles, numSymLayers)
+        m_possibleStackingSeq = generateRandomStackPairs(m_possibleAngles, numSymLayers)
+        if stackIsBalanced(m_possibleStackingSeq) and not (m_possibleStackingSeq in m_initialSequences):
             m_initialSequences.append(m_possibleStackingSeq)
             print(".", end='')
+    print(" ")
     return m_initialSequences
 
 
