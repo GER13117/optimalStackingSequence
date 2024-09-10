@@ -2,9 +2,17 @@ import MaterialFunc as mf
 import numpy as np
 from scipy.optimize import minimize
 import random
+#explained by https://www.sciencedirect.com/science/article/pii/S0263822314005492
 
-possibleAngles = [90, 0, 45, -45]
+# possibleAngles = [90, 0, 45, -45]
 
+def geneatePossibleAngles(start: float, end: float, interval: float):
+    numbers = []
+    current = start
+    while current <= end:
+        numbers.append(round(current, 6))  # Adjust precision as needed
+        current += interval
+    return numbers
 
 def generateRandomStack(m_availableAngles, m_numSymAngles):
     stackingSeq = [random.choice(m_availableAngles) for _ in range(m_numSymAngles)]
@@ -16,12 +24,18 @@ def stackIsBalanced(stackingSeq):
     return np.isclose(m_matA[0][2], 0, atol=1e-10) and np.isclose(m_matA[1][2], 0, atol=1e-10)
 
 
-def generateStackingSeqs(numSymLayers, numStackingSeqs):
+def generateStackingSeqs(numSymLayers: int, numStackingSeqs: int, interval: float):
     m_initialSequences = []
+    print("Generating stacking sequences")
+    for i in range(numStackingSeqs):
+        print(".", end='')
+    print(" ")
+    m_possibleAngles = geneatePossibleAngles(-90.0, 90.0, interval)
     while len(m_initialSequences) < numStackingSeqs:
-        m_possibleStackingSeq = generateRandomStack(possibleAngles, numSymLayers)
+        m_possibleStackingSeq = generateRandomStack(m_possibleAngles, numSymLayers)
         if stackIsBalanced(m_possibleStackingSeq):
             m_initialSequences.append(m_possibleStackingSeq)
+            print(".", end='')
     return m_initialSequences
 
 
@@ -55,8 +69,8 @@ def R_panelbuckling_comb(stackingSeq: list, alpha, b, beta, tLayer, N_x, Tau):
     return m_R
 
 
-def optimizeLayers(numSymLayers: int, numStackingSeqs: int, alpha, b, beta, tLayer, N_x, Tau):
-    stackingSeqsRev = generateStackingSeqs(numSymLayers, numStackingSeqs)
+def optimizeLayers(numSymLayers: int, numStackingSeqs: int, alpha, b, beta, tLayer, N_x, Tau, interval: float):
+    stackingSeqsRev = generateStackingSeqs(numSymLayers, numStackingSeqs, interval)
     bestR = 10000
     bestStackingSeqRev = stackingSeqsRev[0]
     for stackingSeqRev in stackingSeqsRev:
@@ -75,9 +89,10 @@ def optimizeLayers(numSymLayers: int, numStackingSeqs: int, alpha, b, beta, tLay
                     if bestCurrentR < bestR:
                         bestR = bestCurrentR
                         bestStackingSeqRev = bestCurrentSeqRev[:]
-                #print("i:", i, "stacking Sequence:", stackingSeqRev[::-1], "R:", R)
+                # print("i:", i, "stacking Sequence:", stackingSeqRev[::-1], "R:", R)
             stackingSeqRev = bestCurrentSeqRev[:]
-            #print("i:", i, "best current Sequence:", stackingSeqRev[::-1], "R:", bestCurrentR)
-        print("best final Sequence:", stackingSeqRev[::-1], "R:", bestCurrentR, "is balanced:", stackIsBalanced(stackingSeqRev[::-1]))
+            # print("i:", i, "best current Sequence:", stackingSeqRev[::-1], "R:", bestCurrentR)
+        print("best final Sequence:", stackingSeqRev[::-1], "R:", bestCurrentR, "is balanced:",
+              stackIsBalanced(stackingSeqRev[::-1]))
 
     print("Best Stacking Sequence:", bestStackingSeqRev[::-1], "R:", bestR)
