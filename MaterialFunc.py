@@ -4,9 +4,6 @@ import numpy as np
 # TODO: Knockdown Factor
 # TODO: Constraints - 10% plyshare, strength?, only integer values for angles
 ########################## PARAMETERS ##########################
-a = 400  # 400mm-800mm
-b = 250  # 150mm-250mm
-alpha = a / b
 tLayer = 0.184  # 0.184mm to 0.25mm
 
 E11 = 130_000  # 130_000 to 160_000 MPa
@@ -15,7 +12,7 @@ G12 = 5_000  # 5_000 to 8_000 MPa
 
 minLayers = 44
 maxLayers = 44
-maxDecimals = 0 #0 => Angles of result are only integer values TODO: Not working
+maxDecimals = 0  # 0 => Angles of result are only integer values TODO: Not working
 
 ########################## CALCULATIONS ##########################
 nu12 = 0.33  # TODO: Needs to be calculated????
@@ -141,6 +138,15 @@ def A_mat(sym_angles):
 
     return A
 
+def T_mat(theta):
+    theta_rad = np.deg2rad(theta)
+    return np.array([
+        [np.cos(theta_rad) ** 2, np.sin(theta_rad) ** 2, 2 * np.sin(theta_rad) * np.cos(theta_rad)],
+        [np.sin(theta_rad) ** 2, np.cos(theta_rad) ** 2, -2 * np.sin(theta_rad) * np.cos(theta_rad)],
+        [-np.sin(theta_rad) * np.cos(theta_rad), np.sin(theta_rad) * np.cos(theta_rad),
+         np.cos(theta_rad) ** 2 - np.sin(theta_rad) ** 2]
+    ])
+
 
 # biaxial
 def sig_x_cr_biax(b, t, beta, alpha, m, n, D11, D12, D22, D66):
@@ -149,11 +155,9 @@ def sig_x_cr_biax(b, t, beta, alpha, m, n, D11, D12, D22, D66):
 
 
 # shear
-def tau_cr(b, t, D11, D12, D22, D66):
+def tau_cr(b: float, t: float, D11: float, D12: float, D22: float, D66: float):
     delta = np.sqrt(D11 * D22) / (D12 + 2 * D66)  # stiffeness ratio
     if delta >= 1:
         return 4 / t / b ** 2 * ((D11 * D22 ** 3) ** (1 / 4) * (8.12 + 5.05 / delta))
     else:
         return 4 / t / b ** 2 * (np.sqrt(D22 * (D12 + 2 * D66)) * (11.7 + 0.532 * delta + 0.938 * delta ** 2))
-
-

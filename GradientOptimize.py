@@ -10,7 +10,7 @@ def halfwavesObj(hWaves, b, t, beta, alpha, D11, D12, D22, D66):
     return mf.sig_x_cr_biax(b, t, beta, alpha, round(m), round(n), D11, D12, D22, D66)
 
 
-def R_panelbuckling_comb(sym_angles, N_x, Tau, beta):
+def R_panelbuckling_comb(sym_angles, N_x, Tau, beta, b, alpha):
     print(3)
     m_numLayers = len(sym_angles) * 2
     m_hPanel = m_numLayers * mf.tLayer
@@ -27,12 +27,12 @@ def R_panelbuckling_comb(sym_angles, N_x, Tau, beta):
 
     # Find amount of halfwaves that make plate as unstable as possible
     m_mostUnstablePlate = minimize(halfwavesObj, m_initialHWaves, method='SLSQP', bounds=m_hWavesBnds,
-                                   args=(mf.b, m_hPanel, beta, mf.alpha, m_D11, m_D12, m_D22, m_D66))
+                                   args=(b, m_hPanel, beta, alpha, m_D11, m_D12, m_D22, m_D66))
 
     print(4)
     # critical loads
     m_sigma_x_cr = m_mostUnstablePlate.fun
-    m_tau_cr = mf.tau_cr(mf.b, m_hPanel, m_D11, m_D12, m_D22, m_D66)
+    m_tau_cr = mf.tau_cr(b, m_hPanel, m_D11, m_D12, m_D22, m_D66)
 
     # applied loads
     m_sigma_x = N_x / m_hPanel
@@ -50,7 +50,7 @@ def R_panelbuckling_comb(sym_angles, N_x, Tau, beta):
     return m_R
 
 
-def optimizeAngles(numLayers, initialSymAngles, iterCount, maxDecimals, N_x, Tau, beta):
+def optimizeAngles(numLayers, initialSymAngles, iterCount, maxDecimals, N_x, Tau, beta, b, alpha):
     # Define bounds for angles
     m_angleBounds = [(-90, 90) for _ in range(numLayers)]
 
@@ -60,7 +60,7 @@ def optimizeAngles(numLayers, initialSymAngles, iterCount, maxDecimals, N_x, Tau
 
     # PLY DOES NOT BUCKLE
     m_con3 = {'type': 'ineq',
-              'fun': lambda sym_angles: 1 - R_panelbuckling_comb(sym_angles, N_x, Tau, beta)}
+              'fun': lambda sym_angles: 1 - R_panelbuckling_comb(sym_angles, N_x, Tau, beta, b, alpha)}
 
     # ANGLES ONLY HAVE SOME AMOUNT OF DECIMALS TODO: FIX NEEDED
     m_con4 = {'type': 'eq',
@@ -74,27 +74,17 @@ def optimizeAngles(numLayers, initialSymAngles, iterCount, maxDecimals, N_x, Tau
     print(2)
     m_optimal_R = minimize(R_panelbuckling_comb, initialSymAngles, method='trust-constr', bounds=m_angleBounds,
                            constraints=m_cons,
-                           options=m_options, args=(N_x, Tau, beta))
+                           options=m_options, args=(N_x, Tau, beta, b, alpha))
     return m_optimal_R
 
-
-def T_mat(theta):
-    theta_rad = np.deg2rad(theta)
-    return np.array([
-        [np.cos(theta_rad) ** 2, np.sin(theta_rad) ** 2, 2 * np.sin(theta_rad) * np.cos(theta_rad)],
-        [np.sin(theta_rad) ** 2, np.cos(theta_rad) ** 2, -2 * np.sin(theta_rad) * np.cos(theta_rad)],
-        [-np.sin(theta_rad) * np.cos(theta_rad), np.sin(theta_rad) * np.cos(theta_rad),
-         np.cos(theta_rad) ** 2 - np.sin(theta_rad) ** 2]
-    ])
-
-
-def optimalLayers(initAngle: float, minLayers: int, maxLayers: int, maxDecimals: int, N_x: float, Tau: float, beta: float):
+def optimalLayers(initAngle: float, minLayers: int, maxLayers: int, maxDecimals: int, N_x: float, Tau: float,
+                  beta: float, b: float, alpha: float):
     for numLayers in range(int(minLayers / 2), int(maxLayers / 2) + 1):
         initialSymAngles = np.empty(numLayers)
         initialSymAngles.fill(initAngle)
         print(1)
         # initial optimization attempt, in order to find minimal amount of plies
-        solution = optimizeAngles(numLayers, initialSymAngles, 1000, maxDecimals, N_x, Tau, beta)
+        solution = optimizeAngles(numLayers, initialSymAngles, 1000, maxDecimals, N_x, Tau, beta, b, alpha)
         print(numLayers, solution)
         if solution.fun < 1:  # TODO: Experiment with different values close to 1
             optimalSymLayers = numLayers
@@ -105,7 +95,7 @@ def optimalLayers(initAngle: float, minLayers: int, maxLayers: int, maxDecimals:
 
             # second optimization step in order to maximize strength of found minimal layer count
             print("Second Optimization Step")
-            solution = optimizeAngles(optimalSymLayers, optimalSymAngles, 10000, maxDecimals, N_x, Tau, beta)
+            solution = optimizeAngles(optimalSymLayers, optimalSymAngles, 10000, maxDecimals, N_x, Tau, beta, b, alpha)
             optimalSymLayers = numLayers
             optimalSymAngles = solution.x
             print("A:")
