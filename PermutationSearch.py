@@ -22,6 +22,7 @@ def progress_bar(counter, max_value, bar_length=40, additional_value=None):
     else:
         print(f"\r[{progress_bar}] {progress * 100:.2f}%", end="")
 
+
 def geneatePossibleAngles(start: float, end: float, interval: float):
     numbers = []
     current = start
@@ -83,52 +84,53 @@ def swapValues(sequence: list, idx1: int, idx2: int):
     return newSeq
 
 
-def R_panelbuckling_comb(stackingSeq: list, alpha, b, beta, tLayer, N_x, Tau):
+def R_panelbuckling_comb(stackingSeq: list, alpha, b, beta, tLayer, N_x, Tau, knockDown: float):
     m_matD = mf.D_mat(stackingSeq)
-    m_D11 = m_matD[0][0]
-    m_D12 = m_matD[0][1]
-    m_D22 = m_matD[1][1]
-    m_D66 = m_matD[2][2]
-    m, n = 1, 1  # TODO: minimizer
-    m_hPanel = tLayer * len(stackingSeq)
-    m_sigma_x_cr = mf.sig_x_cr_biax(b, m_hPanel, beta, alpha, m, n, m_D11, m_D12, m_D22, m_D66)
+    m_D11 = m_matD[0][0] * knockDown
+    m_D12 = m_matD[0][1] * knockDown
+    m_D22 = m_matD[1][1] * knockDown
+    m_D66 = m_matD[2][2] * knockDown
 
+    m, n = 1, 1
+    m_hPanel = tLayer * len(stackingSeq) * 2
+    m_sigma_x_cr = mf.sig_x_cr_biax(b, m_hPanel, beta, alpha, m, n, m_D11, m_D12, m_D22, m_D66)
     for i in range(1, 4):
         for j in range(1, 4):
-            m_sigma_x_cr = min(m_sigma_x_cr, mf.sig_x_cr_biax(b, m_hPanel, beta, alpha, i, j, m_D11, m_D12, m_D22, m_D66))
+            m_sig_x_xr_new = mf.sig_x_cr_biax(b, m_hPanel, beta, alpha, i, j, m_D11, m_D12, m_D22, m_D66)
+            if 0 < m_sig_x_xr_new < m_sigma_x_cr:
+                m_sigma_x_cr = m_sig_x_xr_new
 
-    m_sigma_x_cr = mf.sig_x_cr_biax(b, m_hPanel, beta, alpha, m, n, m_D11, m_D12, m_D22, m_D66)
     m_tau_cr = mf.tau_cr(b, m_hPanel, m_D11, m_D12, m_D22, m_D66)
-
     # applied loads
     m_sigma_x = N_x / m_hPanel
     m_tau = Tau / m_hPanel
 
     # R values
-    m_R_biax = abs(m_sigma_x / m_sigma_x_cr)
-    m_R_shear = abs(m_tau / m_tau_cr)
+    m_R_biax = abs(m_sigma_x / m_sigma_x_cr) * 1.5
+    m_R_shear = abs(m_tau / m_tau_cr) * 1.5
 
     m_R = m_R_biax + m_R_shear ** 2
 
     return m_R
 
 
-def optimizeLayers(numSymLayers: int, numStackingSeqs: int, alpha, b, beta, tLayer, N_x, Tau, interval: float):
+def optimizeLayers(numSymLayers: int, numStackingSeqs: int, alpha: float, b: float, beta: float, tLayer: float,
+                   N_x: float, Tau: float, interval: float, knockDown: float):
     stackingSeqsRev = generateStackingSeqs(numSymLayers, numStackingSeqs, interval)
     bestR = 10000
     bestStackingSeqRev = stackingSeqsRev[0]
     print("Optimizing Stacking Sequence:")
     for idxSeq, stackingSeqRev in enumerate(stackingSeqsRev):
-        bestCurrentR = R_panelbuckling_comb(stackingSeqRev, alpha, b, beta, tLayer, N_x, Tau)
+        bestCurrentR = R_panelbuckling_comb(stackingSeqRev, alpha, b, beta, tLayer, N_x, Tau, knockDown)
         bestCurrentSeqRev = stackingSeqRev[:]
-        progress_bar(idxSeq + 1, len(stackingSeqsRev), additional_value=f"Best RF: {1/bestR:.3f}")
+        progress_bar(idxSeq + 1, len(stackingSeqsRev), additional_value=f"Best RF: {1 / bestR:.3f}")
         for i in range(numSymLayers):
             for j in range(i + 1, numSymLayers):
                 swappedStackingSeqRev = swapValues(stackingSeqRev, i, j)
                 if swappedStackingSeqRev == stackingSeqRev:
                     continue
                 stackingSeqRev = swappedStackingSeqRev
-                R = R_panelbuckling_comb(stackingSeqRev[::-1], alpha, b, beta, tLayer, N_x, Tau)
+                R = R_panelbuckling_comb(stackingSeqRev[::-1], alpha, b, beta, tLayer, N_x, Tau, knockDown)
                 if R < bestCurrentR:
                     bestCurrentR = R
                     bestCurrentSeqRev = stackingSeqRev[:]
@@ -138,10 +140,19 @@ def optimizeLayers(numSymLayers: int, numStackingSeqs: int, alpha, b, beta, tLay
                 # print("i:", i, "stacking Sequence:", stackingSeqRev[::-1], "R:", R)
             stackingSeqRev = bestCurrentSeqRev[:]
             # print("i:", i, "best current Sequence:", stackingSeqRev[::-1], "R:", bestCurrentR)
-        #print("R:", round(bestCurrentR, 3), "RF:", round(1 / bestCurrentR, 3))
+        # print("R:", round(bestCurrentR, 3), "RF:", round(1 / bestCurrentR, 3))
     print(" ")
     bestStackingSeq = bestStackingSeqRev[::-1]
-    print("Best Stacking Sequence:", bestStackingSeq,
+    print("Number auf Layers:", numSymLayers * 2,
+          "\nBest Stacking Sequence:", bestStackingSeq,
           "\nR:", round(bestR, 3), "RF:", round(1 / bestR, 3),
-          "\nis balanced: ", stackIsBalanced(bestStackingSeq),
-          "has max 10% plyshare:", checkPlyShare(bestStackingSeq))
+          "\nis balanced:", stackIsBalanced(bestStackingSeq),
+          "- has max 10% plyshare:", checkPlyShare(bestStackingSeq))
+
+
+def findOptSequence(minLayers: int, maxLayers: int, numStackingSeqs: int, alpha: float, b: float, beta: float,
+                    tLayer: float, N_x: float, Tau: float, interval: float, knockDown: float):
+    minSymLayers = int(minLayers / 2)
+    maxSymLayers = int(maxLayers / 2)
+    for i in range(minSymLayers, maxSymLayers + 1):
+        optimizeLayers(i, numStackingSeqs, alpha, b, beta, tLayer, N_x, Tau, interval, knockDown)

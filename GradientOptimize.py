@@ -11,7 +11,6 @@ def halfwavesObj(hWaves, b, t, beta, alpha, D11, D12, D22, D66):
 
 
 def R_panelbuckling_comb(sym_angles, N_x, Tau, beta, b, alpha):
-    print(3)
     m_numLayers = len(sym_angles) * 2
     m_hPanel = m_numLayers * mf.tLayer
     m_matD = mf.D_mat(sym_angles)
@@ -29,18 +28,19 @@ def R_panelbuckling_comb(sym_angles, N_x, Tau, beta, b, alpha):
     m_mostUnstablePlate = minimize(halfwavesObj, m_initialHWaves, method='SLSQP', bounds=m_hWavesBnds,
                                    args=(b, m_hPanel, beta, alpha, m_D11, m_D12, m_D22, m_D66))
 
-    print(4)
     # critical loads
     m_sigma_x_cr = m_mostUnstablePlate.fun
+    print(m_sigma_x_cr)
     m_tau_cr = mf.tau_cr(b, m_hPanel, m_D11, m_D12, m_D22, m_D66)
+    print(m_tau_cr)
 
     # applied loads
     m_sigma_x = N_x / m_hPanel
     m_tau = Tau / m_hPanel
 
     # R values
-    m_R_biax = abs(m_sigma_x / m_sigma_x_cr)
-    m_R_shear = abs(m_tau / m_tau_cr)
+    m_R_biax = abs(m_sigma_x / m_sigma_x_cr) * 1.5
+    m_R_shear = abs(m_tau / m_tau_cr) * 1.5
 
     m_R = m_R_biax + m_R_shear ** 2
 
@@ -48,7 +48,6 @@ def R_panelbuckling_comb(sym_angles, N_x, Tau, beta, b, alpha):
     print("RF:", 1 / m_R, "- numLayers:", m_numLayers, "- numHalfwaves: ", m_mostUnstablePlate.x, "- Angles:",
           sym_angles)
     return m_R
-
 
 def optimizeAngles(numLayers, initialSymAngles, iterCount, maxDecimals, N_x, Tau, beta, b, alpha):
     # Define bounds for angles

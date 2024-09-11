@@ -6,9 +6,9 @@ import numpy as np
 ########################## PARAMETERS ##########################
 tLayer = 0.184  # 0.184mm to 0.25mm
 
-E11 = 130_000  # 130_000 to 160_000 MPa
-E22 = 10_000  # 10_000 to 14_000 MPa
-G12 = 5_000  # 5_000 to 8_000 MPa
+E11 = 132741.56  # 130_000 to 160_000 MPa
+E22 = 10210.89  # 10_000 to 14_000 MPa
+G12 = 5105.44  # 5_000 to 8_000 MPa
 
 minLayers = 44
 maxLayers = 44
@@ -138,6 +138,7 @@ def A_mat(sym_angles):
 
     return A
 
+
 def T_mat(theta):
     theta_rad = np.deg2rad(theta)
     return np.array([
@@ -149,7 +150,7 @@ def T_mat(theta):
 
 
 # biaxial
-def sig_x_cr_biax(b, t, beta, alpha, m, n, D11, D12, D22, D66):
+def sig_x_cr_biax(b: float, t: float, beta: float, alpha: float, m: float, n: float, D11: float, D12: float, D22: float, D66: float):
     return np.pi ** 2 / b ** 2 / t / ((m / alpha) ** 2 + beta * n ** 2) * (
             D11 * (m / alpha) ** 4 + 2 * (D12 + D66) * (m * n / alpha) ** 2 + D22 * n ** 4)
 
