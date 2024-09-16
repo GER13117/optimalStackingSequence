@@ -63,7 +63,6 @@ def generateStackingSeqs(numSymLayers: int, numStackingSeqs: int, interval: floa
     print("Generating stacking sequences")
     m_possibleAngles = geneatePossibleAngles(-90.0, 90.0, interval)
     while len(m_initialSequences) < numStackingSeqs:
-        # m_possibleStackingSeq = generateRandomStack(m_possibleAngles, numSymLayers)
         m_possibleStackingSeq = generateRandomStackPairs(m_possibleAngles, numSymLayers)
         if stackIsBalanced(m_possibleStackingSeq) and not (
                 m_possibleStackingSeq in m_initialSequences) and checkPlyShare(m_possibleStackingSeq):
@@ -105,15 +104,33 @@ def optimizeLayers(numSymLayers: int, numStackingSeqs: int, interval: float, kno
 
     print(" ")
     bestStackingSeq = bestStackingSeqRev[::-1]
-    print("Number auf Layers:", numSymLayers * 2,
-          "\nBest Stacking Sequence:", bestStackingSeq,
-          "\nR:", round(bestR, 3), "RF:", round(1 / bestR, 3),
-          "\nis balanced:", stackIsBalanced(bestStackingSeq),
-          "- has max 10% plyshare:", checkPlyShare(bestStackingSeq))
+    result = {
+        "numLayers": numSymLayers * 2,
+        "bestStackingSeq": bestStackingSeq,
+        "R": round(bestR, 3),
+        "RF": round(1 / bestR, 3),
+        "isBalanced": stackIsBalanced(bestStackingSeq),
+        "hasMax10ppPlyShare": checkPlyShare(bestStackingSeq)
+    }
+    return result
 
 
-def findOptSequence(minLayers: int, maxLayers: int, numStackingSeqs: int, interval: float, knockDown: float, maxHalfwaves: int):
+def findOptSequence(minLayers: int, maxLayers: int, popSizeCoarse: int, popSizeFine: int, interval: float, knockDown: float, maxHalfwaves: int):
     minSymLayers = int(minLayers / 2)
     maxSymLayers = int(maxLayers / 2)
     for i in range(minSymLayers, maxSymLayers + 1):
-        optimizeLayers(i, numStackingSeqs, interval, knockDown, maxHalfwaves)
+        coarseResult = optimizeLayers(i, popSizeCoarse, interval, knockDown, maxHalfwaves)
+        print("Number auf Layers:", coarseResult["numLayers"],
+              "\nBest Stacking Sequence:", coarseResult["bestStackingSeq"],
+              "\nR:", coarseResult["R"], "RF:", coarseResult["RF"],
+              "\nis balanced:", coarseResult["isBalanced"],
+              "- has max 10% plyshare:", coarseResult["hasMax10ppPlyShare"])
+        if coarseResult["RF"] > 1.0:
+            print("Found first Solution - Starting second optimization Step")
+            fineResult = optimizeLayers(i, popSizeFine, interval, knockDown, maxHalfwaves)
+            print("Number auf Layers:", fineResult["numLayers"],
+                  "\nBest Stacking Sequence:", fineResult["bestStackingSeq"],
+                  "\nR:", fineResult["R"], "RF:", fineResult["RF"],
+                  "\nis balanced:", fineResult["isBalanced"],
+                  "- has max 10% plyshare:", fineResult["hasMax10ppPlyShare"])
+            break;

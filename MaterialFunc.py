@@ -1,8 +1,7 @@
+import sys
+
 import numpy as np
 
-# Einschränkungen: nur symmetrische Laminate mit gerader Anzahl von schichten TODO: Check if statement is true
-# TODO: Knockdown Factor
-# TODO: Constraints - 10% plyshare, strength?, only integer values for angles
 ########################## PARAMETERS ##########################
 
 from main import E11, E22, G12, tLayer, b, alpha, beta, N_x, Tau
@@ -131,31 +130,20 @@ def A_mat(sym_angles):
 
     return A
 
-
-def T_mat(theta):
-    theta_rad = np.deg2rad(theta)
-    return np.array([
-        [np.cos(theta_rad) ** 2, np.sin(theta_rad) ** 2, 2 * np.sin(theta_rad) * np.cos(theta_rad)],
-        [np.sin(theta_rad) ** 2, np.cos(theta_rad) ** 2, -2 * np.sin(theta_rad) * np.cos(theta_rad)],
-        [-np.sin(theta_rad) * np.cos(theta_rad), np.sin(theta_rad) * np.cos(theta_rad),
-         np.cos(theta_rad) ** 2 - np.sin(theta_rad) ** 2]
-    ])
-
-
 # biaxial
-def sig_x_cr_biax(t: float, m: float, n: float, D11: float, D12: float, D22: float,
+def sig_x_cr_biax(hPanel: float, m: float, n: float, D11: float, D12: float, D22: float,
                   D66: float):
-    return np.pi ** 2 / b ** 2 / t / ((m / alpha) ** 2 + beta * n ** 2) * (
+    return np.pi ** 2 / b ** 2 / hPanel / ((m / alpha) ** 2 + beta * n ** 2) * (
             D11 * (m / alpha) ** 4 + 2 * (D12 + D66) * (m * n / alpha) ** 2 + D22 * n ** 4)
 
 
 # shear
-def tau_cr(t: float, D11: float, D12: float, D22: float, D66: float):
+def tau_cr(hPanel: float, D11: float, D12: float, D22: float, D66: float):
     delta = np.sqrt(D11 * D22) / (D12 + 2 * D66)  # stiffeness ratio
     if delta >= 1:
-        return 4 / t / b ** 2 * ((D11 * D22 ** 3) ** (1 / 4) * (8.12 + 5.05 / delta))
+        return 4 / hPanel / b ** 2 * ((D11 * D22 ** 3) ** (1 / 4) * (8.12 + 5.05 / delta))
     else:
-        return 4 / t / b ** 2 * (np.sqrt(D22 * (D12 + 2 * D66)) * (11.7 + 0.532 * delta + 0.938 * delta ** 2))
+        return 4 / hPanel / b ** 2 * (np.sqrt(D22 * (D12 + 2 * D66)) * (11.7 + 0.532 * delta + 0.938 * delta ** 2))
 
 
 def R_panelbuckling_comb(stackingSeq: list, knockDown: float, maxHalfwaves: int):
@@ -165,12 +153,12 @@ def R_panelbuckling_comb(stackingSeq: list, knockDown: float, maxHalfwaves: int)
     m_D22 = m_matD[1][1] * knockDown
     m_D66 = m_matD[2][2] * knockDown
 
-    m, n = 1, 1
     m_hPanel = tLayer * len(stackingSeq) * 2
-    m_sigma_x_cr = sig_x_cr_biax(m_hPanel, m, n, m_D11, m_D12, m_D22, m_D66)
-    for i in range(1, maxHalfwaves + 1):
-        for j in range(1, maxHalfwaves + 1):
-            m_sig_x_xr_new = sig_x_cr_biax(m_hPanel, i, j, m_D11, m_D12, m_D22, m_D66)
+
+    m_sigma_x_cr = sys.float_info.max
+    for m in range(1, maxHalfwaves + 1):
+        for n in range(1, maxHalfwaves + 1):
+            m_sig_x_xr_new = sig_x_cr_biax(m_hPanel, m, n, m_D11, m_D12, m_D22, m_D66)
             if 0 < m_sig_x_xr_new < m_sigma_x_cr:
                 m_sigma_x_cr = m_sig_x_xr_new
 
@@ -180,7 +168,7 @@ def R_panelbuckling_comb(stackingSeq: list, knockDown: float, maxHalfwaves: int)
     m_tau = Tau / m_hPanel
 
     # R values
-    m_R_biax = abs(m_sigma_x / m_sigma_x_cr) * 1.5
+    m_R_biax = abs(m_sigma_x / m_sigma_x_cr) * 1.5 # 1.5 for ultimate loading
     m_R_shear = abs(m_tau / m_tau_cr) * 1.5
 
     m_R = m_R_biax + m_R_shear ** 2

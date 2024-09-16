@@ -1,5 +1,3 @@
-# helper function to find amount of halfwaves for minimal stability
-# for finding the halfwaves to make the plates as unstable as possible it is only necessary to use sig_biax as tau_cr is idemepent of the max number of halfwaves
 import MaterialFunc as mf
 import numpy as np
 from scipy.optimize import minimize
@@ -20,6 +18,7 @@ def optimizeAngles(numLayers, initialSymAngles, iterCount, maxDecimals, knockDow
     m_con4 = {'type': 'eq',
               'fun': lambda sym_angles: np.amax(abs(np.around(sym_angles, decimals=maxDecimals) - sym_angles))}
 
+    # TODO: Add 10% ply share constraint
     # m_con6 = "10% of each ply share"
     m_cons = [m_con1, m_con2, m_con3]
 
