@@ -1,5 +1,6 @@
 import GradientOptimize
 import PermutationSearch
+
 # Material
 E11 = 132741.56  # 130_000 to 160_000 MPa
 E22 = 10210.89  # 10_000 to 14_000 MPa
@@ -17,9 +18,10 @@ N_y = -500  # 300N/mm to -1000N/mm
 Tau = 100  # 100 to 800N/mm
 beta = N_y / N_x
 
+
 def main():
-    PermutationSearch.findOptSequence(52, 54, 100, alpha, b, beta, tLayer, N_x, Tau, 5, knockDown, 3)
-    GradientOptimize.optimalLayers(45, 10, 44, 2, N_x, Tau, beta, b, alpha, tLayer, knockDown, 3)
+    #PermutationSearch.findOptSequence(52, 54, 100, 5, knockDown, 3)
+    GradientOptimize.optimalLayers(45, 10, 44, 2, knockDown, 3)
 
 
 if __name__ == "__main__":

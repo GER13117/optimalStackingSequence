@@ -53,19 +53,19 @@ def generateRandomStackPairs(m_availableAngles, m_numSymAngles):
     return stackingSeq
 
 
-def stackIsBalanced(stackingSeq, tLayer):
-    m_matA = mf.A_mat(stackingSeq, tLayer)
+def stackIsBalanced(stackingSeq):
+    m_matA = mf.A_mat(stackingSeq)
     return np.isclose(m_matA[0][2], 0, atol=1e-10) and np.isclose(m_matA[1][2], 0, atol=1e-10)
 
 
-def generateStackingSeqs(numSymLayers: int, numStackingSeqs: int, interval: float, tLayer: float):
+def generateStackingSeqs(numSymLayers: int, numStackingSeqs: int, interval: float):
     m_initialSequences = []
     print("Generating stacking sequences")
     m_possibleAngles = geneatePossibleAngles(-90.0, 90.0, interval)
     while len(m_initialSequences) < numStackingSeqs:
         # m_possibleStackingSeq = generateRandomStack(m_possibleAngles, numSymLayers)
         m_possibleStackingSeq = generateRandomStackPairs(m_possibleAngles, numSymLayers)
-        if stackIsBalanced(m_possibleStackingSeq, tLayer) and not (
+        if stackIsBalanced(m_possibleStackingSeq) and not (
                 m_possibleStackingSeq in m_initialSequences) and checkPlyShare(m_possibleStackingSeq):
             m_initialSequences.append(m_possibleStackingSeq)
         progress_bar(len(m_initialSequences), numStackingSeqs,
@@ -79,14 +79,13 @@ def swapValues(sequence: list, idx1: int, idx2: int):
     newSeq[idx1], newSeq[idx2] = newSeq[idx2], newSeq[idx1]
     return newSeq
 
-def optimizeLayers(numSymLayers: int, numStackingSeqs: int, alpha: float, b: float, beta: float, tLayer: float,
-                   N_x: float, Tau: float, interval: float, knockDown: float, maxHalfwaves: int):
-    stackingSeqsRev = generateStackingSeqs(numSymLayers, numStackingSeqs, interval, tLayer)
+def optimizeLayers(numSymLayers: int, numStackingSeqs: int, interval: float, knockDown: float, maxHalfwaves: int):
+    stackingSeqsRev = generateStackingSeqs(numSymLayers, numStackingSeqs, interval)
     bestR = 10000
     bestStackingSeqRev = stackingSeqsRev[0]
     print("Optimizing Stacking Sequence:")
     for idxSeq, stackingSeqRev in enumerate(stackingSeqsRev):
-        bestCurrentR = mf.R_panelbuckling_comb(stackingSeqRev, alpha, b, beta, tLayer, N_x, Tau, knockDown, maxHalfwaves)
+        bestCurrentR = mf.R_panelbuckling_comb(stackingSeqRev[::-1], knockDown, maxHalfwaves)
         bestCurrentSeqRev = stackingSeqRev[:]
         progress_bar(idxSeq + 1, len(stackingSeqsRev), additional_value=f"Best RF: {1 / bestR:.3f}")
         for i in range(numSymLayers):
@@ -95,7 +94,7 @@ def optimizeLayers(numSymLayers: int, numStackingSeqs: int, alpha: float, b: flo
                 if swappedStackingSeqRev == stackingSeqRev:
                     continue
                 stackingSeqRev = swappedStackingSeqRev
-                R = mf.R_panelbuckling_comb(stackingSeqRev[::-1], alpha, b, beta, tLayer, N_x, Tau, knockDown, maxHalfwaves)
+                R = mf.R_panelbuckling_comb(stackingSeqRev[::-1], knockDown, maxHalfwaves)
                 if R < bestCurrentR:
                     bestCurrentR = R
                     bestCurrentSeqRev = stackingSeqRev[:]
@@ -109,13 +108,12 @@ def optimizeLayers(numSymLayers: int, numStackingSeqs: int, alpha: float, b: flo
     print("Number auf Layers:", numSymLayers * 2,
           "\nBest Stacking Sequence:", bestStackingSeq,
           "\nR:", round(bestR, 3), "RF:", round(1 / bestR, 3),
-          "\nis balanced:", stackIsBalanced(bestStackingSeq, tLayer),
+          "\nis balanced:", stackIsBalanced(bestStackingSeq),
           "- has max 10% plyshare:", checkPlyShare(bestStackingSeq))
 
 
-def findOptSequence(minLayers: int, maxLayers: int, numStackingSeqs: int, alpha: float, b: float, beta: float,
-                    tLayer: float, N_x: float, Tau: float, interval: float, knockDown: float, maxHalfwaves: int):
+def findOptSequence(minLayers: int, maxLayers: int, numStackingSeqs: int, interval: float, knockDown: float, maxHalfwaves: int):
     minSymLayers = int(minLayers / 2)
     maxSymLayers = int(maxLayers / 2)
     for i in range(minSymLayers, maxSymLayers + 1):
-        optimizeLayers(i, numStackingSeqs, alpha, b, beta, tLayer, N_x, Tau, interval, knockDown, maxHalfwaves)
+        optimizeLayers(i, numStackingSeqs, interval, knockDown, maxHalfwaves)
