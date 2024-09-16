@@ -72,6 +72,19 @@ def generateStackingSeqs(numSymLayers: int, numStackingSeqs: int, interval: floa
     print(" ")
     return m_initialSequences
 
+def stackingSeqFromList(symSeq: list):
+    sequence_str = '/'.join(f'{angle}' for angle in symSeq)
+    sequence_str = f'[{sequence_str}]'
+    sequence_str += 's'
+    return sequence_str
+
+
+def printResult(result: dict):
+    print("Number auf Layers:", result["numLayers"],
+          "\nBest Stacking Sequence:", stackingSeqFromList(result["bestStackingSeq"]),
+          "\nR:", result["R"], "RF:", result["RF"],
+          "\nis balanced:", result["isBalanced"],
+          "- has max 10% plyshare:", result["hasMax10ppPlyShare"])
 
 def swapValues(sequence: list, idx1: int, idx2: int):
     newSeq = sequence[:]
@@ -115,22 +128,14 @@ def optimizeLayers(numSymLayers: int, numStackingSeqs: int, interval: float, kno
     return result
 
 
-def findOptSequence(minLayers: int, maxLayers: int, popSizeCoarse: int, popSizeFine: int, interval: float, knockDown: float, maxHalfwaves: int):
+def findOptSequence(minLayers: int, maxLayers: int, popSizeCoarse: int, popSizeFine: int, interval: float, knockDown: float, maxHalfwaves: int, minRF = 1.0):
     minSymLayers = int(minLayers / 2)
     maxSymLayers = int(maxLayers / 2)
     for i in range(minSymLayers, maxSymLayers + 1):
         coarseResult = optimizeLayers(i, popSizeCoarse, interval, knockDown, maxHalfwaves)
-        print("Number auf Layers:", coarseResult["numLayers"],
-              "\nBest Stacking Sequence:", coarseResult["bestStackingSeq"],
-              "\nR:", coarseResult["R"], "RF:", coarseResult["RF"],
-              "\nis balanced:", coarseResult["isBalanced"],
-              "- has max 10% plyshare:", coarseResult["hasMax10ppPlyShare"])
-        if coarseResult["RF"] > 1.0:
+        printResult(coarseResult)
+        if coarseResult["RF"] > minRF:
             print("Found first Solution - Starting second optimization Step")
             fineResult = optimizeLayers(i, popSizeFine, interval, knockDown, maxHalfwaves)
-            print("Number auf Layers:", fineResult["numLayers"],
-                  "\nBest Stacking Sequence:", fineResult["bestStackingSeq"],
-                  "\nR:", fineResult["R"], "RF:", fineResult["RF"],
-                  "\nis balanced:", fineResult["isBalanced"],
-                  "- has max 10% plyshare:", fineResult["hasMax10ppPlyShare"])
-            break;
+            printResult(fineResult)
+            break
