@@ -1,3 +1,6 @@
+import time
+from math import factorial
+
 import MaterialFunc as mf
 import numpy as np
 import random
@@ -5,11 +8,8 @@ import random
 # explained by https://www.sciencedirect.com/science/article/pii/S0263822314005492
 
 def progress_bar(counter, max_value, bar_length=40, additional_value=None):
-    # Calculate progress as a percentage
     progress = counter / max_value
-    # Calculate the number of hashes (#) in the bar
     block = int(round(bar_length * progress))
-    # Create the progress bar string
     progress_bar = "#" * block + "-" * (bar_length - block)
 
     # Display the progress bar with the percentage
@@ -23,7 +23,7 @@ def geneatePossibleAngles(start: float, end: float, interval: float):
     numbers = []
     current = start
     while current <= end:
-        numbers.append(round(current, 6))  # Adjust precision as needed
+        numbers.append(round(current, 2))
         current += interval
     return numbers
 
@@ -35,12 +35,6 @@ def checkPlyShare(stackingSeq: list):
         plyShare = stackingSeq.count(angle) / len(stackingSeq)
         shareArray.append(plyShare)
     return max(shareArray) <= 0.1
-
-
-def generateRandomStack(m_availableAngles, m_numSymAngles):
-    stackingSeq = [random.choice(m_availableAngles) for _ in range(m_numSymAngles)]
-    stackingSeq = [90.0 if angle == -90.0 else angle for angle in stackingSeq]
-    return stackingSeq
 
 
 def generateRandomStackPairs(m_availableAngles, m_numSymAngles):
@@ -79,7 +73,11 @@ def stackingSeqFromList(symSeq: list):
     return sequence_str
 
 
-def printResult(result: dict):
+def printResultMinimal(result: dict):
+    print("Number auf Layers:", result["numLayers"],
+          "\nRF:", result["RF"])
+
+def printResultFull(result: dict):
     print("Number auf Layers:", result["numLayers"],
           "\nBest Stacking Sequence:", stackingSeqFromList(result["bestStackingSeq"]),
           "\nR:", result["R"], "RF:", result["RF"],
@@ -127,15 +125,41 @@ def optimizeLayers(numSymLayers: int, numStackingSeqs: int, interval: float, kno
     }
     return result
 
+def checkInputs(minLayers: int, maxLayers: int, interval: float):
+    if minLayers < 20:
+        print("WARNING: For the given minimum layer count a maximum 10% plyshare is impossible. The minimal ply amount is 20. The minimum plycount will be set to 20")
+
+    if maxLayers < 20:
+        print("WARNING: For the given maximum layer count a maximum 10% plyshare is impossible. The minimal ply amount is 20. The maximum plycount will be set to 20")
+
+    minDifferentAngles = int(maxLayers / 2) #minimum amount of different angles
+    maxPossibleAngles = 180 / interval # max amount of possible different angles
+    if maxPossibleAngles < minDifferentAngles:
+        print("WARNING: The given angle interval of", interval, "is too big for your maximum Layer amount. The program will get stuck at", 360 / interval, "Layers")
+
+    time.sleep(1.0)
 
 def findOptSequence(minLayers: int, maxLayers: int, popSizeCoarse: int, popSizeFine: int, interval: float, knockDown: float, maxHalfwaves: int, minRF = 1.0):
-    minSymLayers = int(minLayers / 2)
-    maxSymLayers = int(maxLayers / 2)
+    if maxLayers < minLayers:
+        print("max. and min. layers are switched")
+        minLayers, maxLayers = maxLayers, minLayers
+
+    checkInputs(minLayers, maxLayers, interval)
+
+    minSymLayers = max(int(minLayers / 2), 10)
+    maxSymLayers = max(int(maxLayers / 2), 10)
+
+
     for i in range(minSymLayers, maxSymLayers + 1):
+        print("<--------------------------------------------->")
         coarseResult = optimizeLayers(i, popSizeCoarse, interval, knockDown, maxHalfwaves)
-        printResult(coarseResult)
+        printResultMinimal(coarseResult)
         if coarseResult["RF"] > minRF:
+            print("<=============================================>")
             print("Found first Solution - Starting second optimization Step")
             fineResult = optimizeLayers(i, popSizeFine, interval, knockDown, maxHalfwaves)
-            printResult(fineResult)
+            if fineResult["RF"] < coarseResult["RF"]: # For the unlikely case that no better solution is found in the second optimization step
+                printResultFull(coarseResult)
+            else:
+                printResultFull(fineResult)
             break
