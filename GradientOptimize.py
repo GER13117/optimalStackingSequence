@@ -7,12 +7,12 @@ def optimizeAngles(numLayers, initialSymAngles, iterCount, maxDecimals, knockDow
     m_angleBounds = [(-90, 90) for _ in range(numLayers)]
 
     # BALANCED PLY
-    m_con1 = {'type': 'eq', 'fun': lambda sym_angles: mf.A_mat(sym_angles)[0][2]}
-    m_con2 = {'type': 'eq', 'fun': lambda sym_angles: mf.A_mat(sym_angles)[1][2]}
+    m_con1 = {'type': 'eq', 'fun': lambda sym_angles: mf.A_mat_sym(sym_angles)[0][2]} # TODO: Fix Sym
+    m_con2 = {'type': 'eq', 'fun': lambda sym_angles: mf.A_mat_sym(sym_angles)[1][2]} # TODO: Fix Sym
 
     # PLY DOES NOT BUCKLE
     m_con3 = {'type': 'ineq',
-              'fun': lambda sym_angles: 1 - mf.R_panelbuckling_comb(sym_angles, knockDown, maxHalfwaves)}
+              'fun': lambda sym_angles: 1 - mf.R_panelbuckling_comb_sym(sym_angles, knockDown, maxHalfwaves)} # TODO: Fix Sym
 
     # ANGLES ONLY HAVE SOME AMOUNT OF DECIMALS TODO: FIX NEEDED
     m_con4 = {'type': 'eq',
@@ -23,7 +23,7 @@ def optimizeAngles(numLayers, initialSymAngles, iterCount, maxDecimals, knockDow
     m_cons = [m_con1, m_con2, m_con3]
 
     m_options = {'maxiter': iterCount}
-    m_optimal_R = minimize(mf.R_panelbuckling_comb, initialSymAngles, method='trust-constr', bounds=m_angleBounds,
+    m_optimal_R = minimize(mf.R_panelbuckling_comb_sym, initialSymAngles, method='trust-constr', bounds=m_angleBounds,  # TODO: Fix Sym
                            constraints=m_cons,
                            options=m_options,
                            args=(knockDown, maxHalfwaves))
@@ -49,11 +49,11 @@ def optimalLayers(initAngle: float, minLayers: int, maxLayers: int, maxDecimals:
             optimalSymLayers = numLayers
             optimalSymAngles = solution.x
             print("A:")
-            print(mf.A_mat(optimalSymAngles))
+            print(mf.A_mat_sym(optimalSymAngles)) # TODO: Fix Sym
             print("B:")
-            print(mf.B_mat(optimalSymAngles))
+            print(mf.B_mat_sym(optimalSymAngles)) # TODO: Fix Sym
             print("D:")
-            print(mf.D_mat(optimalSymAngles))
+            print(mf.D_mat_sym(optimalSymAngles)) # TODO: Fix Sym
             print(np.concatenate((optimalSymAngles, optimalSymAngles[::-1])))
             print(optimalSymLayers * 2)
             print(1 / solution.fun)

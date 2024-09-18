@@ -44,9 +44,9 @@ def Q_bar(theta):
 
 
 # ABD Functions
-def D_mat(sym_angles):
-    m_numLayers = len(sym_angles) * 2
-    m_angles = np.concatenate((sym_angles, sym_angles[::-1]))
+
+def D_mat(angles):
+    m_numLayers = len(angles)
     m_hPanel = m_numLayers * tLayer
 
     # array of all z_k
@@ -62,7 +62,7 @@ def D_mat(sym_angles):
 
     Q_bars = [0] * m_numLayers
     for k in range(m_numLayers):
-        Q_bars[k] = Q_bar(m_angles[k])
+        Q_bars[k] = Q_bar(angles[k])
 
     D_k = [0] * m_numLayers
 
@@ -73,9 +73,13 @@ def D_mat(sym_angles):
     return D
 
 
-def B_mat(sym_angles):
-    m_numLayers = len(sym_angles) * 2
+def D_mat_sym(sym_angles):
     m_angles = np.concatenate((sym_angles, sym_angles[::-1]))
+    return D_mat(m_angles)
+
+
+def B_mat(angles):
+    m_numLayers = len(angles)
     m_hPanel = m_numLayers * tLayer
 
     # array of all z_k
@@ -91,7 +95,7 @@ def B_mat(sym_angles):
 
     Q_bars = [0] * m_numLayers
     for k in range(m_numLayers):
-        Q_bars[k] = Q_bar(m_angles[k])
+        Q_bars[k] = Q_bar(angles[k])
 
     B_k = [0] * m_numLayers
 
@@ -102,9 +106,13 @@ def B_mat(sym_angles):
     return B
 
 
-def A_mat(sym_angles):
-    m_numLayers = len(sym_angles) * 2
+def B_mat_sym(sym_angles):
     m_angles = np.concatenate((sym_angles, sym_angles[::-1]))
+    return B_mat(m_angles)
+
+
+def A_mat(angles):
+    m_numLayers = len(angles)
     m_hPanel = m_numLayers * tLayer
 
     # array of all z_k
@@ -120,7 +128,7 @@ def A_mat(sym_angles):
 
     Q_bars = [0] * m_numLayers
     for k in range(m_numLayers):
-        Q_bars[k] = Q_bar(m_angles[k])
+        Q_bars[k] = Q_bar(angles[k])
 
     A_k = [0] * m_numLayers
 
@@ -129,6 +137,12 @@ def A_mat(sym_angles):
     A = np.array(A_k).sum(axis=0)
 
     return A
+
+
+def A_mat_sym(sym_angles):
+    m_angles = np.concatenate((sym_angles, sym_angles[::-1]))
+    return A_mat(m_angles)
+
 
 # biaxial
 def sig_x_cr_biax(hPanel: float, m: float, n: float, D11: float, D12: float, D22: float,
@@ -147,13 +161,13 @@ def tau_cr(hPanel: float, D11: float, D12: float, D22: float, D66: float):
 
 
 def R_panelbuckling_comb(stackingSeq: list, knockDown: float, maxHalfwaves: int):
-    m_matD = D_mat(stackingSeq)
+    m_matD = D_mat(stackingSeq)  # TODO: Test Sym
     m_D11 = m_matD[0][0] * knockDown
     m_D12 = m_matD[0][1] * knockDown
     m_D22 = m_matD[1][1] * knockDown
     m_D66 = m_matD[2][2] * knockDown
 
-    m_hPanel = tLayer * len(stackingSeq) * 2
+    m_hPanel = tLayer * len(stackingSeq)
 
     m_sigma_x_cr = sys.float_info.max
     for m in range(1, maxHalfwaves + 1):
@@ -168,9 +182,14 @@ def R_panelbuckling_comb(stackingSeq: list, knockDown: float, maxHalfwaves: int)
     m_tau = Tau / m_hPanel
 
     # R values
-    m_R_biax = abs(m_sigma_x / m_sigma_x_cr) * 1.5 # 1.5 for ultimate loading
+    m_R_biax = abs(m_sigma_x / m_sigma_x_cr) * 1.5  # 1.5 for ultimate loading
     m_R_shear = abs(m_tau / m_tau_cr) * 1.5
 
     m_R = m_R_biax + m_R_shear ** 2
 
     return m_R
+
+
+def R_panelbuckling_comb_sym(stackingSeqSym: list, knockDown: float, maxHalfwaves: int):
+    m_angles = np.concatenate((stackingSeqSym, stackingSeqSym[::-1])).tolist()
+    return R_panelbuckling_comb(m_angles, knockDown, maxHalfwaves)

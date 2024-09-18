@@ -37,18 +37,24 @@ def checkPlyShare(stackingSeq: list):
     return max(shareArray) <= 0.1
 
 
-def generateRandomStackPairs(m_availableAngles, m_numSymAngles):
-    stackingSeq = [random.choice(m_availableAngles) for _ in range(int(m_numSymAngles / 2))]
+def generateRandomStackPairs(availableAngles, numSymAngles):
+    stackingSeq = [random.choice(availableAngles) for _ in range(int(numSymAngles / 2))]
     negAngles = [-x for x in stackingSeq]
     stackingSeq.extend(negAngles)
-    if m_numSymAngles % 2 != 0:
+    if numSymAngles % 2 != 0:
         stackingSeq.append(random.choice([0.0, 90.0]))
     stackingSeq = [90.0 if angle == -90.0 else angle for angle in stackingSeq]
     return stackingSeq
 
+def generatStacksWithMidP(halfStack: list, midPLaneAngle: float): #Takes a half of a stacking sequence and returns two whole stacking sequences with 0° and 90° as its midplane
+    fullStack = halfStack.copy()
+    fullStack.append(midPLaneAngle)
+    fullStack.extend(halfStack[::-1])
+
+    return fullStack
 
 def stackIsBalanced(stackingSeq):
-    m_matA = mf.A_mat(stackingSeq)
+    m_matA = mf.A_mat_sym(stackingSeq) # TODO: Fix Sym
     return np.isclose(m_matA[0][2], 0, atol=1e-10) and np.isclose(m_matA[1][2], 0, atol=1e-10)
 
 
@@ -89,13 +95,23 @@ def swapValues(sequence: list, idx1: int, idx2: int):
     newSeq[idx1], newSeq[idx2] = newSeq[idx2], newSeq[idx1]
     return newSeq
 
+""" TODO:
+- CHECK WETHER Formulas work with midplane
+
+- change layer count to total
+- check if layercount is even: true: old procedings, false: new procedings
+- if new procedings check wether 10pp plyshare is still fullfilled, if not skip stacking sequence
+
+- MAYBE: 2 Fcts. add possibilty to not check stacks with midplane
+"""
+
 def optimizeLayers(numSymLayers: int, numStackingSeqs: int, interval: float, knockDown: float, maxHalfwaves: int):
     stackingSeqsRev = generateStackingSeqs(numSymLayers, numStackingSeqs, interval)
     bestR = 10000
     bestStackingSeqRev = stackingSeqsRev[0]
     print("Optimizing Stacking Sequence:")
     for idxSeq, stackingSeqRev in enumerate(stackingSeqsRev):
-        bestCurrentR = mf.R_panelbuckling_comb(stackingSeqRev[::-1], knockDown, maxHalfwaves)
+        bestCurrentR = mf.R_panelbuckling_comb_sym(stackingSeqRev[::-1], knockDown, maxHalfwaves) # TODO: Fix Sym
         bestCurrentSeqRev = stackingSeqRev[:]
         progress_bar(idxSeq + 1, len(stackingSeqsRev), additional_value=f"Best RF: {1 / bestR:.3f}")
         for i in range(numSymLayers):
@@ -104,7 +120,7 @@ def optimizeLayers(numSymLayers: int, numStackingSeqs: int, interval: float, kno
                 if swappedStackingSeqRev == stackingSeqRev:
                     continue
                 stackingSeqRev = swappedStackingSeqRev
-                R = mf.R_panelbuckling_comb(stackingSeqRev[::-1], knockDown, maxHalfwaves)
+                R = mf.R_panelbuckling_comb_sym(stackingSeqRev[::-1], knockDown, maxHalfwaves) # TODO: Fix Sym
                 if R < bestCurrentR:
                     bestCurrentR = R
                     bestCurrentSeqRev = stackingSeqRev[:]
