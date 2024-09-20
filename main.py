@@ -20,7 +20,7 @@ beta = N_y / N_x
 
 
 def main():
-    PermutationSearch.findOptSequence(36, 100, 40, 5000, 5, knockDown, 3, True)
+    PermutationSearch.findOptSequence(36, 100, 25, 5000, 5, knockDown, 3, True)
     #GradientOptimize.optimalLayers(45, 10, 44, 2, knockDown, 3)
     print(" ")
 
