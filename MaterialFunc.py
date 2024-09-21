@@ -161,7 +161,7 @@ def tau_cr(hPanel: float, D11: float, D12: float, D22: float, D66: float):
 
 
 def R_panelbuckling_comb(stackingSeq: list, knockDown: float, maxHalfwaves: int):
-    m_matD = D_mat(stackingSeq)  # TODO: Test Sym
+    m_matD = D_mat(stackingSeq)
     m_D11 = m_matD[0][0] * knockDown
     m_D12 = m_matD[0][1] * knockDown
     m_D22 = m_matD[1][1] * knockDown

@@ -61,6 +61,9 @@ def stackIsBalanced(stackingSeq):
     m_matA = mf.A_mat_sym(stackingSeq)
     return np.isclose(m_matA[0][2], 0, atol=1e-10) and np.isclose(m_matA[1][2], 0, atol=1e-10)
 
+def stackIsBalancedMidP(stackingSeq):
+    m_matA = mf.A_mat(stackingSeq)
+    return np.isclose(m_matA[0][2], 0, atol=1e-10) and np.isclose(m_matA[1][2], 0, atol=1e-10)
 
 def generateStackingSeqs(numSymLayers: int, numStackingSeqs: int, interval: float):
     m_initialSequences = []
@@ -114,7 +117,7 @@ def optimizeLayers(numSymLayers: int, numStackingSeqs: int, interval: float, kno
     bestStackingSeqRev = stackingSeqsRev[0]
     print("Optimizing Stacking Sequence:")
     for idxSeq, stackingSeqRev in enumerate(stackingSeqsRev):
-        bestCurrentR = mf.R_panelbuckling_comb_sym(stackingSeqRev[::-1], knockDown, maxHalfwaves)  # TODO: Fix Sym
+        bestCurrentR = mf.R_panelbuckling_comb_sym(stackingSeqRev[::-1], knockDown, maxHalfwaves)
         bestCurrentSeqRev = stackingSeqRev[:]
         progress_bar(idxSeq + 1, len(stackingSeqsRev), additional_value=f"Best RF: {1 / bestR:.3f}")
         for i in range(numSymLayers):
@@ -123,7 +126,7 @@ def optimizeLayers(numSymLayers: int, numStackingSeqs: int, interval: float, kno
                 if swappedStackingSeqRev == stackingSeqRev:
                     continue
                 stackingSeqRev = swappedStackingSeqRev
-                R = mf.R_panelbuckling_comb_sym(stackingSeqRev[::-1], knockDown, maxHalfwaves)  # TODO: Fix Sym
+                R = mf.R_panelbuckling_comb_sym(stackingSeqRev[::-1], knockDown, maxHalfwaves)
                 if R < bestCurrentR:
                     bestCurrentR = R
                     bestCurrentSeqRev = stackingSeqRev[:]
@@ -202,7 +205,7 @@ def optimizeLayersMidP(numSymLayers: int, numStackingSeqs: int, interval: float,
         "midPAngle": bestMidPAngle,
         "R": round(bestR, 3),
         "RF": round(1 / bestR, 3),
-        "isBalanced": stackIsBalanced(bestStackingSeq),
+        "isBalanced": stackIsBalancedMidP(generatStacksWithMidP(bestStackingSeq, bestMidPAngle)),
         "hasMax10ppPlyShare": checkPlyShare(generatStacksWithMidP(bestStackingSeq, bestMidPAngle))
     }
     return result
@@ -218,9 +221,7 @@ def checkInputs(minLayers: int, maxLayers: int, interval: float):
             "WARNING: For the given maximum layer count a maximum 10% plyshare is impossible. The minimal ply amount is 20. The maximum plycount will be set to 20")
 
     minDifferentAngles = int(maxLayers / 2 / 2)  # minimum amount of different angles
-    print(minDifferentAngles)
     maxPossibleAngles = 180 / interval  # max amount of possible different angles
-    print(maxPossibleAngles)
     if maxPossibleAngles < minDifferentAngles:
         print("WARNING: The given angle interval of", interval,
               "is too big for your maximum Layer amount. The program will get stuck at", 360 / interval, "Layers")

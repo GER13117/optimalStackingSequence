@@ -20,8 +20,8 @@ beta = N_y / N_x
 
 
 def main():
-    PermutationSearch.findOptSequence(36, 100, 25, 5000, 5, knockDown, 3, True)
-    #GradientOptimize.optimalLayers(45, 10, 44, 2, knockDown, 3)
+    PermutationSearch.findOptSequence(20, 100, 30, 5000, 5, knockDown, 3, True)
+    #GradientOptimize.optimalLayers(45, 10, 44, knockDown, 3)
     print(" ")
 
 if __name__ == "__main__":
