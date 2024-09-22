@@ -29,7 +29,7 @@ def optimalLayers(initAngle: float, minLayers: int, maxLayers: int, knockDown: f
         initialSymAngles.fill(initAngle)
         # initial optimization attempt, in order to find minimal amount of plies
         solution = optimizeAngles(numLayers, initialSymAngles, 1000, knockDown, maxHalfwaves)
-        print(numLayers, solution.x, solution.fun)
+        print("Layer Count:", numLayers * 2, "\nstacking sequence:", str(solution.x) + "s","\nRF:", 1/solution.fun)
         if solution.fun < 1/minRF:
             optimalSymLayers = numLayers
             optimalSymAngles = solution.x
